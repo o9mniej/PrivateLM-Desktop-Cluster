@@ -203,7 +203,7 @@ static fs::path write_qr_svg(const fs::path& output_dir, const std::string& host
     return output_path;
 }
 
-static VOID WINAPI on_mdns_registration(DWORD status, PVOID, PDNS_SERVICE_INSTANCE instance) {
+static PDNS_SERVICE_INSTANCE g_mdns_instance = nullptr; // Keep the input instance alive for the async registration lifetime.\n\nstatic VOID WINAPI on_mdns_registration(DWORD status, PVOID, PDNS_SERVICE_INSTANCE instance) {
     if (status != ERROR_SUCCESS) {
         std::cerr << "mDNS registration callback reported Windows error " << status << ".\n";
     }
@@ -213,7 +213,7 @@ static VOID WINAPI on_mdns_registration(DWORD status, PVOID, PDNS_SERVICE_INSTAN
 static bool advertise_worker(const std::string& name, const NetworkAddress& network,
     unsigned short port, uint64_t ram_mb, double bandwidth, const std::string& id) {
     const std::wstring instance_name = L"PrivateLM " + widen(name) + L"._privatelm._tcp.local.";
-    const std::wstring host_name = widen(name) + L".local.";
+    const std::wstring host_name = widen(computer_name()) + L".local.";
     const std::wstring ram = std::to_wstring(ram_mb);
     std::wostringstream bw_stream;
     bw_stream << std::fixed << std::setprecision(1) << bandwidth;
