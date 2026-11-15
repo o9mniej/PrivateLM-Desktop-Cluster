@@ -256,7 +256,9 @@ static uint64_t fnv_hash(const uint8_t * data, size_t len, uint64_t hash = 0xcbf
 }
 
 static bool send_msg(socket_ptr sock, const void * msg, size_t msg_size) {
-    if (!sock->send_data(&msg_size, sizeof(msg_size))) {
+    // RPC wire lengths are always uint64_t, even when the server is a 32-bit process.
+    const uint64_t wire_size = static_cast<uint64_t>(msg_size);
+    if (!sock->send_data(&wire_size, sizeof(wire_size))) {
         return false;
     }
     if (!sock->send_data(msg, msg_size)) {
@@ -311,7 +313,9 @@ static bool send_rpc_cmd(socket_ptr sock, enum rpc_cmd cmd, const void * input, 
     if (!sock->send_data(&cmd_byte, sizeof(cmd_byte))) {
         return false;
     }
-    if (!sock->send_data(&input_size, sizeof(input_size))) {
+    // Keep the wire protocol identical across 32-bit and 64-bit peers.
+    const uint64_t wire_input_size = static_cast<uint64_t>(input_size);
+    if (!sock->send_data(&wire_input_size, sizeof(wire_input_size))) {
         return false;
     }
     if (!sock->send_data(input, input_size)) {
