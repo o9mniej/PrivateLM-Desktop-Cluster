@@ -439,7 +439,8 @@ class ClusterService extends GetxService {
     return used.length;
   }
 
-  /// Fastest first, each up to its free memory, until the model is placed.
+  /// Fill CUDA VRAM first, then CPU workers ordered by measured host-RAM speed.
+  /// For CPU-only clusters this remains the existing fastest-first policy.
   static void _fillFastestFirst(List<_Phone> phones, double needMb) {
     final bySpeed = [...phones]..sort((a, b) {
       // A CUDA worker contributes GPU VRAM and GPU compute; its host-RAM
