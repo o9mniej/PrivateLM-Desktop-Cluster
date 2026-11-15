@@ -49,7 +49,12 @@ target_link_libraries(privatelm-worker PRIVATE
 )
 
 if(WIN32)
-    target_compile_definitions(privatelm-worker PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_compile_definitions(privatelm-worker PRIVATE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        WINVER=0x0A00
+        _WIN32_WINNT=0x0A00
+    )
 endif()
 
 set_target_properties(privatelm-worker PROPERTIES
