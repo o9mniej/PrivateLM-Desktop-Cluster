@@ -21,7 +21,7 @@ jobs:
           submodules: recursive
 
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.20
+        uses: Jimver/cuda-toolkit@v0.2.32
         with:
           cuda: "12.8.1"
           method: network
