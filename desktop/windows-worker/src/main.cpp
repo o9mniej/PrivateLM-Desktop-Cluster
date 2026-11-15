@@ -322,7 +322,13 @@ int main(int argc, char** argv) {
         MEMORYSTATUSEX memory{};
         memory.dwLength = sizeof(memory);
         if (!GlobalMemoryStatusEx(&memory)) throw std::runtime_error("Could not read available system RAM");
-        const uint64_t ram_mb = memory.ullAvailPhys / (1024ull * 1024ull);
+        uint64_t ram_mb = memory.ullAvailPhys / (1024ull * 1024ull);
+#ifndef _WIN64
+        // A 32-bit worker cannot address all physical RAM in a 64-bit machine.
+        // Advertise a conservative limit so the master does not assign it
+        // more model memory than this process can realistically map.
+        ram_mb = std::min<uint64_t>(ram_mb, 1536);
+#endif
         const double bandwidth = measure_memory_bandwidth_gbps();
         const std::string id = make_worker_id(app_data);
         const auto addresses = local_ipv4_addresses();
