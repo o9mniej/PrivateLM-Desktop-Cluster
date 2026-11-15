@@ -79,3 +79,44 @@ jobs:
           path: desktop/linux-worker/dist/cpu-x64/
           if-no-files-found: error
           retention-days: 14
+
+  build-cpu-arm64:
+    name: Linux ARM64 (Raspberry Pi 5)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config
+
+      - name: Configure and build ARM CPU variants
+        run: |
+          cmake -S desktop/linux-worker -B desktop/linux-worker/build-arm64 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF \
+            -DGGML_CPU_ALL_VARIANTS=ON
+          cmake --build desktop/linux-worker/build-arm64 --parallel
+
+      - name: Stage ARM64 worker and backends
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="desktop/linux-worker/dist/cpu-arm64"
+          mkdir -p "$out"
+          find desktop/linux-worker/build-arm64 \\( -type f -o -type l \\) \\( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \\) -exec cp -L {} "$out/" \\;
+          required=(privatelm-worker libggml.so libggml-base.so libggml-rpc.so libggml-cpu.so libggml-cpu-armv8.0_1.so libggml-cpu-armv8.2_2.so)
+          for file in "${required[@]}"; do
+            test -f "$out/$file" || { echo "Missing required ARM64 runtime file: $file"; exit 1; }
+          done
+          echo "Staged Raspberry Pi-compatible ARM64 worker files:"
+          ls -lh "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: privatelm-linux-worker-cpu-arm64
+          path: desktop/linux-worker/dist/cpu-arm64/
+          if-no-files-found: error
+          retention-days: 14
