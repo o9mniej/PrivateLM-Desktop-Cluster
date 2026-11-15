@@ -1,104 +1,106 @@
 # PrivateLM Windows Worker (experimental)
 
-This folder adds a **Windows GGML RPC worker** without changing the Flutter
-application or its Android/iOS plugin.
+The Windows worker is a **single native C++ executable**. Start
+`privatelm-worker.exe` and it automatically:
 
-It builds against the exact llama.cpp source vendored in
+1. Reads currently available system RAM and measures approximate memory-read bandwidth.
+2. Detects the active LAN IPv4 address and loads the persistent worker ID.
+3. Generates an app-compatible `privatelm://worker` QR code as an SVG and opens it.
+4. Loads the CUDA backend when a usable GPU is available, otherwise falls back to CPU.
+5. Advertises `_privatelm._tcp.local.` with the same TXT metadata as the mobile worker.
+6. Starts the GGML RPC server on TCP port `50052`.
+
+There is no Python runtime, Python dependency installation, wrapper process, or
+separate setup script. Keep the console window open while the worker is in use.
+
+## Compatibility
+
+The worker builds against the exact llama.cpp / GGML source vendored in
 `local_plugins/llama_flutter_android/android/src/main/cpp/llama.cpp`.
-The worker uses GGML RPC protocol **7.0.0** and advertises the same mDNS
-service and TXT fields as the original mobile worker:
+This keeps its RPC protocol aligned with the app.
 
-- Service: `_privatelm._tcp.`
+- mDNS service: `_privatelm._tcp.local.`
 - Default TCP port: `50052`
-- TXT: `ram`, `bw`, `model`, `v=rpc7`, `id`
+- TXT fields: `ram`, `bw`, `model`, `v=rpc7`, `id`
+- QR URI: `privatelm://worker?host=...&port=...&name=...&ram=...&bw=...&id=...`
 
-It also generates a QR code in the same `privatelm://worker` format already
-understood by the original app. The QR contains the worker IP, port, name,
-available RAM, memory bandwidth, and persistent worker ID. Available RAM is
-reported (not installed RAM), matching the mobile worker's existing metadata.
-The app applies its existing 75% safety margin when estimating worker capacity.
+The QR reports **currently available RAM**, not installed RAM. The mobile app
+continues to apply its existing 75% safety margin. The worker ID is persisted
+under `%LOCALAPPDATA%\PrivateLM\worker-id`.
 
-The QR PNG is saved under `%LOCALAPPDATA%\PrivateLM\worker-qr-<ip>.png`
-and the first detected address's QR is opened automatically. If the PC has
-multiple network interfaces, use the QR for the address on the same LAN as
-the phone.
+The QR is saved under `%LOCALAPPDATA%\PrivateLM\worker-qr-<ip>.svg` and
+opened using the default browser. If it does not open automatically, open that
+SVG file manually.
 
 ## Requirements
 
 - Windows 10/11 x64
 - Visual Studio 2022 with the **Desktop development with C++** workload
 - CMake 3.22+
-- Python 3.10+
-- NVIDIA CUDA Toolkit compatible with the CUDA version supported by the
-  vendored llama.cpp revision (optional; omit CUDA for a CPU-only worker)
-- NVIDIA driver installed if using CUDA
+- NVIDIA CUDA Toolkit compatible with the vendored llama.cpp revision (optional;
+  omit CUDA for a CPU-only worker)
+- NVIDIA driver installed when using CUDA
+
+No Python installation or Python packages are required.
 
 ## Build
 
-Run from PowerShell:
+Run from PowerShell at the repository root:
 
 ```powershell
-cd desktop/windows-worker
-cmake -S . -B build -A x64 -DPRIVATELM_ENABLE_CUDA=ON
-cmake --build build --config Release
+cmake -S desktop/windows-worker -B desktop/windows-worker/build -A x64 -DPRIVATELM_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=120
+cmake --build desktop/windows-worker/build --config Release
 ```
 
 For a CPU-only build:
 
 ```powershell
-cmake -S . -B build -A x64 -DPRIVATELM_ENABLE_CUDA=OFF
-cmake --build build --config Release
+cmake -S desktop/windows-worker -B desktop/windows-worker/build-cpu -A x64 -DPRIVATELM_ENABLE_CUDA=OFF
+cmake --build desktop/windows-worker/build-cpu --config Release
 ```
 
-The executable and GGML backend DLLs are expected in the build output directory.
-If CMake places backend DLLs in a different configuration subdirectory, copy
-the generated backend DLLs beside `privatelm-worker.exe` before running.
-
-## Install Python dependencies
-
-```powershell
-py -m pip install -r requirements.txt
-```
+The executable is placed in the build output's `bin` directory. Keep the
+GGML runtime DLLs beside `privatelm-worker.exe`; the CI workflow stages a
+ready-to-run folder containing the executable and its required DLLs.
 
 ## Run
 
-```powershell
-.\run-worker.ps1
-```
-
-Or choose a port and thread count:
+Double-click `privatelm-worker.exe`, or run it from PowerShell:
 
 ```powershell
-.\run-worker.ps1 -Port 50052 -Threads 8 -Name "Gaming-PC"
+.\privatelm-worker.exe
 ```
 
-The worker will:
-1. Measure currently available system RAM and approximate memory-read bandwidth.
-2. Generate a QR code containing the app-compatible worker URI and open the first
-   detected network address's QR image.
-3. Start the native GGML RPC server on `0.0.0.0:50052`.
-4. Advertise itself over mDNS using the same metadata.
-5. Stop the RPC process and withdraw the mDNS record when Ctrl+C is pressed.
+Optional arguments:
 
-On the phone, open **PrivateLM > Phone cluster > Master > Scan a worker's QR code**.
-If the PC has multiple network interfaces, scan the QR for the IP on the phone's
-Wi-Fi network.
+```powershell
+.\privatelm-worker.exe --port 50052 --threads 8 --name "Gaming-PC"
+```
+
+On the phone, open **PrivateLM > Phone cluster > Master > Scan a worker's QR
+code**. The app does not need to be changed for this pairing flow.
 
 Allow the worker through Windows Defender Firewall **only on Private networks**.
-Do not expose TCP 50052 to the public internet.
+The RPC protocol has no authentication or encryption. Use it only on a trusted
+LAN; do not expose or port-forward TCP port 50052 to the public internet.
 
 ## Current scope / limitations
 
-- This is the **worker**, not the Windows master/coordinator yet.
-- It does not modify the original Flutter application.
-- It serves locally registered CPU and CUDA devices when those backends are
-  built and load successfully.
-- mDNS discovery may be blocked by some networks; QR pairing avoids needing
-  multicast discovery.
-- The RPC protocol itself has no authentication or encryption. Run only on a
-  trusted LAN. Do not port-forward this service.
-- Available RAM is sampled when the worker starts, matching the existing
-  mobile worker's "free at start" behaviour. Restart the worker to refresh it.
+- This is the Windows **worker**, not the Windows master/coordinator.
+- It does not add Flutter Windows support or modify the existing mobile app.
+- It serves the selected CUDA GPU when available, with CPU fallback.
+- The worker chooses one active IPv4 adapter for its QR and mDNS advertisement.
+  If your phone is on a different network interface, use manual pairing with
+  that interface's address instead.
+- Windows' built-in DNS-SD API is used for mDNS; if service advertising is
+  blocked or unavailable, QR pairing remains available.
+- Available RAM is sampled at startup. Restart the worker to refresh it.
+
+## Third-party code
+
+The QR encoder in `src/third_party` is Project Nayuki's QR Code generator,
+distributed under the MIT License. See
+`src/third_party/LICENSE.qrcodegen.txt`.
 
 ## Protocol alignment
 
