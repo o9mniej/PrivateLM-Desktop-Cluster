@@ -64,28 +64,45 @@ int main(int argc, char** argv) {
             return true;
         };
 
-        if (!load_backend("ggml-cpu.dll")) {
-            throw std::runtime_error("CPU backend is required");
-        }
-        // CUDA is optional at runtime; a CPU-only worker is still useful.
-        load_backend("ggml-cuda.dll");
-
+        // Prefer CUDA devices. Only register CPU if CUDA is unavailable,
+        // so the master does not split this worker's workload across both.
         ggml_backend_dev_t devices[GGML_RPC_MAX_SERVERS] = {};
         size_t device_count = 0;
-        for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
-            ggml_backend_dev_t dev = ggml_backend_dev_get(i);
-            const auto type = ggml_backend_dev_type(dev);
-            if (type != GGML_BACKEND_DEVICE_TYPE_CPU &&
-                type != GGML_BACKEND_DEVICE_TYPE_GPU &&
-                type != GGML_BACKEND_DEVICE_TYPE_IGPU) {
-                continue;
+        const bool cuda_loaded = load_backend("ggml-cuda.dll");
+        if (cuda_loaded) {
+            for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+                ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+                const auto type = ggml_backend_dev_type(dev);
+                if (type != GGML_BACKEND_DEVICE_TYPE_GPU &&
+                    type != GGML_BACKEND_DEVICE_TYPE_IGPU) {
+                    continue;
+                }
+                if (device_count >= GGML_RPC_MAX_SERVERS) break;
+                devices[device_count++] = dev;
             }
-            if (device_count >= GGML_RPC_MAX_SERVERS) break;
-            devices[device_count++] = dev;
-            std::cout << "Serving device: " << ggml_backend_dev_name(dev)
-                      << " (" << ggml_backend_dev_description(dev) << ")\n";
         }
-        if (device_count == 0) throw std::runtime_error("No local GGML devices were registered");
+
+        if (device_count > 0) {
+            std::cout << "Selected CUDA/GPU backend (GPU-first mode).\\n";
+        } else {
+            std::cout << "CUDA unavailable or no CUDA devices detected; falling back to CPU.\\n";
+            if (!load_backend("ggml-cpu.dll")) {
+                throw std::runtime_error("Neither a usable CUDA GPU nor the CPU backend is available");
+            }
+            for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+                ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+                if (ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_CPU) continue;
+                if (device_count >= GGML_RPC_MAX_SERVERS) break;
+                devices[device_count++] = dev;
+            }
+        }
+
+        for (size_t i = 0; i < device_count; ++i) {
+            auto dev = devices[i];
+            std::cout << "Serving device: " << ggml_backend_dev_name(dev)
+                      << " (" << ggml_backend_dev_description(dev) << ")\\n";
+        }
+        if (device_count == 0) throw std::runtime_error("No usable CUDA or CPU devices were registered");
 
         if (!load_backend("ggml-rpc.dll")) {
             throw std::runtime_error("RPC backend is required");
