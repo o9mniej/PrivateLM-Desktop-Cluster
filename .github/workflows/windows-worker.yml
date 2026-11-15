@@ -40,13 +40,17 @@ jobs:
           $out = "desktop/windows-worker/dist/cuda"
           New-Item -ItemType Directory -Force $out | Out-Null
           Get-ChildItem "desktop/windows-worker/build-cuda" -Recurse -File |
-    Where-Object { $_.Extension -eq ".dll" -or $_.Name -eq "privatelm-worker.exe" } |
-    Copy-Item -Destination $out -Force
-  $missing = @("ggml.dll", "ggml-base.dll", "ggml-rpc.dll") | Where-Object { -not (Test-Path (Join-Path $out $_)) }
-  if ($missing.Count -gt 0) { throw "Missing required runtime DLL(s): $($missing -join ', ')" }
-          if (-not (Test-Path "$out/privatelm-worker.exe")) {
-            throw "privatelm-worker.exe was not found in the build output"
+            Where-Object { $_.Extension -eq ".dll" -or $_.Name -eq "privatelm-worker.exe" } |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $out -Force }
+
+          $required = @("privatelm-worker.exe", "ggml.dll", "ggml-base.dll", "ggml-rpc.dll", "ggml-cuda.dll")
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path $out $_)) }
+          if ($missing.Count -gt 0) {
+            throw "Missing required CUDA runtime file(s): $($missing -join ', ')"
           }
+
+          Write-Host "Staged CUDA runtime files:"
+          Get-ChildItem $out -File | Select-Object Name, Length | Format-Table -AutoSize
 
       - uses: actions/upload-artifact@v4
         with:
@@ -75,13 +79,17 @@ jobs:
           $out = "desktop/windows-worker/dist/cpu"
           New-Item -ItemType Directory -Force $out | Out-Null
           Get-ChildItem "desktop/windows-worker/build-cpu" -Recurse -File |
-    Where-Object { $_.Extension -eq ".dll" -or $_.Name -eq "privatelm-worker.exe" } |
-    Copy-Item -Destination $out -Force
-  $missing = @("ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-rpc.dll") | Where-Object { -not (Test-Path (Join-Path $out $_)) }
-  if ($missing.Count -gt 0) { throw "Missing required runtime DLL(s): $($missing -join ', ')" }
-          if (-not (Test-Path "$out/privatelm-worker.exe")) {
-            throw "privatelm-worker.exe was not found in the build output"
+            Where-Object { $_.Extension -eq ".dll" -or $_.Name -eq "privatelm-worker.exe" } |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $out -Force }
+
+          $required = @("privatelm-worker.exe", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-rpc.dll")
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path $out $_)) }
+          if ($missing.Count -gt 0) {
+            throw "Missing required CPU runtime file(s): $($missing -join ', ')"
           }
+
+          Write-Host "Staged CPU runtime files:"
+          Get-ChildItem $out -File | Select-Object Name, Length | Format-Table -AutoSize
 
       - uses: actions/upload-artifact@v4
         with:
