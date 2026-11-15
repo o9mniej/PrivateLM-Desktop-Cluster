@@ -33,7 +33,7 @@ add_subdirectory("${LLAMA_CPP_DIR}" llama.cpp)
 add_executable(privatelm-worker src/main.cpp)
 target_include_directories(privatelm-worker PRIVATE
     "${LLAMA_CPP_DIR}/ggml/include")
-target_link_libraries(privatelm-worker PRIVATE ggml-base)
+target_link_libraries(privatelm-worker PRIVATE ggml)
 
 if(WIN32)
     target_compile_definitions(privatelm-worker PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
