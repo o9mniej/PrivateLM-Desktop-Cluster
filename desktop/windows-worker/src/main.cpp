@@ -204,7 +204,9 @@ static fs::path write_qr_svg(const fs::path& output_dir, const std::string& host
 }
 
 static PDNS_SERVICE_INSTANCE g_mdns_instance = nullptr; // Keep the input instance alive for async registration.
-static DNS_SERVICE_REGISTER_REQUEST g_mdns_request{}; // The Windows DNS-SD API may retain this request until its callback.\n\nstatic VOID WINAPI on_mdns_registration(DWORD status, PVOID, PDNS_SERVICE_INSTANCE instance) {
+static DNS_SERVICE_REGISTER_REQUEST g_mdns_request{}; // The Windows DNS-SD API may retain this request until its callback.
+
+static VOID WINAPI on_mdns_registration(DWORD status, PVOID, PDNS_SERVICE_INSTANCE instance) {
     if (status != ERROR_SUCCESS) {
         std::cerr << "mDNS registration callback reported Windows error " << status << ".\n";
     }
