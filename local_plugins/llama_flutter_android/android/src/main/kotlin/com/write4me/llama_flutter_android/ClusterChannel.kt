@@ -266,6 +266,8 @@ class ClusterChannel(
                 "port" to info.port,
                 "ramMb" to attrs["ram"]?.toLongOrNull(),
                 "bandwidth" to attrs["bw"]?.toDoubleOrNull(),
+                "backend" to attrs["backend"],
+                "vramMb" to attrs["vram"]?.toLongOrNull(),
                 "model" to attrs["model"],
                 "id" to attrs["id"],
                 "version" to attrs["v"],
