@@ -275,7 +275,8 @@ int main(int argc, char** argv) {
         const std::array<const char*, 3> cpu_variants = {
             "libggml-cpu-avx2.so",
             "libggml-cpu-avx.so",
-            "libggml-cpu-baseline.so"
+            "libggml-cpu-baseline.so",
+            "libggml-cpu.so" // standard single-backend manual builds
         };
         bool cpu_loaded = false;
         for (const char* variant : cpu_variants) {
