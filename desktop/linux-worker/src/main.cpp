@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -14,6 +15,7 @@
 #include <sched.h>
 #include <sstream>
 #include <stdexcept>
+#include <random>
 #include <string>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -26,6 +28,12 @@
 #include "third_party/qrcodegen.hpp"
 
 namespace fs = std::filesystem;
+
+static pid_t g_mdns_pid = -1;
+static void stop_mdns_on_signal(int signal_number) {
+    if (g_mdns_pid > 0) kill(g_mdns_pid, SIGTERM);
+    _exit(128 + signal_number);
+}
 
 struct NetworkAddress {
     std::string address;
@@ -167,7 +175,7 @@ static void open_file(const fs::path& path) {
     // Do not wait: xdg-open may remain alive for the lifetime of the browser.
 }
 
-static void start_mdns(const std::string& name, unsigned short port, uint64_t ram_mb,
+static pid_t start_mdns(const std::string& name, unsigned short port, uint64_t ram_mb,
     double bandwidth, const std::string& id) {
     const pid_t child = fork();
     if (child == 0) {
@@ -283,7 +291,9 @@ int main(int argc, char** argv) {
         const fs::path qr = write_qr_svg(app_data, network.address, port, name, ram_mb, bandwidth, id);
         std::cout << "Pairing QR: " << qr << '\n';
         open_file(qr);
-        start_mdns(name, port, ram_mb, bandwidth, id);
+        std::signal(SIGINT, stop_mdns_on_signal);
+        std::signal(SIGTERM, stop_mdns_on_signal);
+        g_mdns_pid = start_mdns(name, port, ram_mb, bandwidth, id);
 
         const fs::path cache = app_data / "rpc-cache";
         fs::create_directories(cache);
