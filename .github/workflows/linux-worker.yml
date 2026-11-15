@@ -106,7 +106,7 @@ jobs:
           set -euo pipefail
           out="desktop/linux-worker/dist/cpu-arm64"
           mkdir -p "$out"
-          find desktop/linux-worker/build-arm64 \\( -type f -o -type l \\) \\( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \\) -exec cp -L {} "$out/" \\;
+          find desktop/linux-worker/build-arm64 \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \) -exec cp -L {} "$out/" \;
           required=(privatelm-worker libggml.so libggml-base.so libggml-rpc.so libggml-cpu.so libggml-cpu-armv8.0_1.so libggml-cpu-armv8.2_2.so)
           for file in "${required[@]}"; do
             test -f "$out/$file" || { echo "Missing required ARM64 runtime file: $file"; exit 1; }
