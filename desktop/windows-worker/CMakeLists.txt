@@ -21,6 +21,13 @@ set(GGML_BACKEND_DL ON CACHE BOOL "Load GGML backends as DLLs" FORCE)
 set(GGML_RPC ON CACHE BOOL "Build the GGML RPC backend" FORCE)
 set(GGML_RPC_RDMA OFF CACHE BOOL "Use TCP RPC" FORCE)
 set(GGML_NATIVE OFF CACHE BOOL "Build portable CPU kernels for other Windows PCs" FORCE)
+
+# MSVC Win32 cannot link GGML's BMI2 IQ1 kernels because they use the
+# 64-bit _pdep_u64 intrinsic. Keep BMI2 enabled for x64, but use the
+# portable AVX2 implementation for 32-bit workers.
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(GGML_BMI2 OFF CACHE BOOL "Disable 64-bit BMI2 intrinsics for Win32" FORCE)
+endif()
 set(GGML_CUDA ${PRIVATELM_ENABLE_CUDA} CACHE BOOL "Build CUDA backend" FORCE)
 set(GGML_VULKAN OFF CACHE BOOL "CUDA is the initial GPU backend" FORCE)
 set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
