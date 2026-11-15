@@ -197,9 +197,10 @@ static pid_t start_mdns(const std::string& name, unsigned short port, uint64_t r
     }
     if (child < 0) {
         std::cerr << "mDNS: could not start Avahi publisher; QR/manual pairing remains available.\n";
-        return;
+        return -1;
     }
     std::cout << "mDNS: starting Avahi service advertisement (if avahi-publish-service is installed).\n";
+    return child;
 }
 
 static size_t parse_threads(int argc, char** argv) {
