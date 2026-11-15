@@ -52,61 +52,7 @@ jobs:
           $cudaBin = Join-Path $env:CUDA_PATH "bin"
           $cudaRuntime = Get-ChildItem $cudaBin -File |
             Where-Object {
-              $_.Name -match '^(cudart64_12|cublas64_12|cublasLt64_12|nvJitLink_12|nvrtc64_12|nvrtc-builtins64_12|nvfatbin).*\.dll
-          $missing = $required | Where-Object { -not (Test-Path (Join-Path $out $_)) }
-          if ($missing.Count -gt 0) {
-            throw "Missing required CUDA runtime file(s): $($missing -join ', ')"
-          }
-
-          Write-Host "Staged CUDA runtime files:"
-          Get-ChildItem $out -File | Select-Object Name, Length | Format-Table -AutoSize
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: privatelm-windows-worker-cuda
-          path: desktop/windows-worker/dist/cuda/
-          if-no-files-found: error
-          retention-days: 14
-
-  build-cpu:
-    name: Windows x64 (CPU fallback)
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Configure
-        run: cmake -S desktop/windows-worker -B desktop/windows-worker/build-cpu -A x64 -DPRIVATELM_ENABLE_CUDA=OFF
-
-      - name: Build
-        run: cmake --build desktop/windows-worker/build-cpu --config Release --parallel
-
-      - name: Stage CPU worker
-        shell: pwsh
-        run: |
-          $out = "desktop/windows-worker/dist/cpu"
-          New-Item -ItemType Directory -Force $out | Out-Null
-          Get-ChildItem "desktop/windows-worker/build-cpu" -Recurse -File |
-            Where-Object { $_.Extension -eq ".dll" -or $_.Name -eq "privatelm-worker.exe" } |
-            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $out -Force }
-
-          $required = @("privatelm-worker.exe", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-rpc.dll")
-          $missing = $required | Where-Object { -not (Test-Path (Join-Path $out $_)) }
-          if ($missing.Count -gt 0) {
-            throw "Missing required CPU runtime file(s): $($missing -join ', ')"
-          }
-
-          Write-Host "Staged CPU runtime files:"
-          Get-ChildItem $out -File | Select-Object Name, Length | Format-Table -AutoSize
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: privatelm-windows-worker-cpu
-          path: desktop/windows-worker/dist/cpu/
-          if-no-files-found: error
-          retention-days: 14
-
+              $_.Name -match '^(cudart64_12|cublas64_12|cublasLt64_12|nvJitLink_12|nvrtc64_12|nvrtc-builtins64_12|nvfatbin).*\.dll$'
             }
           foreach ($dll in $cudaRuntime) {
             Copy-Item -LiteralPath $dll.FullName -Destination $out -Force
