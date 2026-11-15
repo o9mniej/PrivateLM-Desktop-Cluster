@@ -34,7 +34,7 @@ SVG file manually.
 
 ## Requirements
 
-- Windows 10/11 x64
+- Windows 10/11 x64 for the 64-bit builds; Windows 10 x86 for the separate 32-bit CPU build
 - Visual Studio 2022 with the **Desktop development with C++** workload
 - CMake 3.22+
 - NVIDIA CUDA Toolkit compatible with the vendored llama.cpp revision (optional;
@@ -52,7 +52,16 @@ cmake -S desktop/windows-worker -B desktop/windows-worker/build -A x64 -DPRIVATE
 cmake --build desktop/windows-worker/build --config Release
 ```
 
-For a CPU-only build:
+For a 32-bit Windows CPU build:
+
+```powershell
+cmake -S desktop/windows-worker -B desktop/windows-worker/build-cpu-x86 -A Win32 -DPRIVATELM_ENABLE_CUDA=OFF
+cmake --build desktop/windows-worker/build-cpu-x86 --config Release
+```
+
+The 32-bit worker conservatively advertises at most 1536 MiB of RAM because a 32-bit process cannot address all physical memory. It is intended to contribute smaller portions of a model to a cluster, not host multi-gigabyte model allocations by itself. CI publishes it as `privatelm-windows-worker-cpu-x86`.
+
+For a CPU-only x64 build:
 
 ```powershell
 cmake -S desktop/windows-worker -B desktop/windows-worker/build-cpu -A x64 -DPRIVATELM_ENABLE_CUDA=OFF
