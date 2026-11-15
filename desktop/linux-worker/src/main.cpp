@@ -272,11 +272,21 @@ int main(int argc, char** argv) {
         // Try optimized CPU plugins first. GGML's backend score function performs
         // runtime CPUID checks and rejects variants whose required ISA is unavailable.
         // Only the first compatible CPU backend is registered.
-        const std::array<const char*, 4> cpu_variants = {
+        const std::array<const char*, 12> cpu_variants = {
+            // x86-64 optimized variants (missing files are harmless on ARM).
             "libggml-cpu-avx2.so",
             "libggml-cpu-avx.so",
             "libggml-cpu-baseline.so",
-            "libggml-cpu.so" // standard single-backend manual builds
+            // ARM variants, highest feature sets first. GGML checks runtime CPU support.
+            "libggml-cpu-armv9.2_2.so",
+            "libggml-cpu-armv9.2_1.so",
+            "libggml-cpu-armv8.6_2.so",
+            "libggml-cpu-armv8.6_1.so",
+            "libggml-cpu-armv8.2_3.so",
+            "libggml-cpu-armv8.2_2.so",
+            "libggml-cpu-armv8.2_1.so",
+            "libggml-cpu-armv8.0_1.so",
+            "libggml-cpu.so" // generic/manual build fallback
         };
         bool cpu_loaded = false;
         for (const char* variant : cpu_variants) {
