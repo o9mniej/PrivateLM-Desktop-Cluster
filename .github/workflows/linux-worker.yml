@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           out="desktop/linux-worker/dist/cpu-x64"
           mkdir -p "$out"
-          find desktop/linux-worker/build -type f \( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \) -exec cp -L {} "$out/" \;
+          find desktop/linux-worker/build \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \) -exec cp -L {} "$out/" \;
           required=(privatelm-worker libggml.so libggml-base.so libggml-cpu.so libggml-rpc.so)
           for file in "${required[@]}"; do
             test -f "$out/$file" || { echo "Missing required runtime file: $file"; exit 1; }
