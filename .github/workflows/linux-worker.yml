@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-cpu-x64:
-    name: Linux x64 (CPU)
+    name: Linux x64 (runtime CPU variants)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -25,22 +25,48 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config
 
-      - name: Configure
-        run: cmake -S desktop/linux-worker -B desktop/linux-worker/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF \
+      - name: Configure and build portable baseline
+        run: |
+          cmake -S desktop/linux-worker -B desktop/linux-worker/build-baseline -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF \
             -DGGML_SSE42=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF \
-            -DGGML_BMI2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_AVX512=OFF
+            -DGGML_BMI2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF \
+            -DGGML_AVX_VNNI=OFF -DGGML_AVX512=OFF
+          cmake --build desktop/linux-worker/build-baseline --parallel
 
-      - name: Build
-        run: cmake --build desktop/linux-worker/build --parallel
+      - name: Configure and build AVX variant
+        run: |
+          cmake -S desktop/linux-worker -B desktop/linux-worker/build-avx -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF \
+            -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_AVX2=OFF \
+            -DGGML_BMI2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF \
+            -DGGML_AVX_VNNI=OFF -DGGML_AVX512=OFF
+          cmake --build desktop/linux-worker/build-avx --parallel
 
-      - name: Stage worker
+      - name: Configure and build AVX2 variant
+        run: |
+          cmake -S desktop/linux-worker -B desktop/linux-worker/build-avx2 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF \
+            -DGGML_SSE42=ON -DGGML_AVX=ON -DGGML_AVX2=ON \
+            -DGGML_BMI2=OFF -DGGML_FMA=ON -DGGML_F16C=ON \
+            -DGGML_AVX_VNNI=OFF -DGGML_AVX512=OFF
+          cmake --build desktop/linux-worker/build-avx2 --parallel
+
+      - name: Stage worker and CPU variants
         shell: bash
         run: |
           set -euo pipefail
           out="desktop/linux-worker/dist/cpu-x64"
           mkdir -p "$out"
-          find desktop/linux-worker/build \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \) -exec cp -L {} "$out/" \;
-          required=(privatelm-worker libggml.so libggml-base.so libggml-cpu.so libggml-rpc.so)
+
+          # Shared runtime libraries and the worker are identical across variants.
+          find desktop/linux-worker/build-baseline \\( -type f -o -type l \\) \\( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \\) -exec cp -L {} "$out/" \;
+
+          cp -L desktop/linux-worker/build-baseline/bin/libggml-cpu.so "$out/libggml-cpu-baseline.so"
+          cp -L desktop/linux-worker/build-avx/bin/libggml-cpu.so "$out/libggml-cpu-avx.so"
+          cp -L desktop/linux-worker/build-avx2/bin/libggml-cpu.so "$out/libggml-cpu-avx2.so"
+
+          required=(privatelm-worker libggml.so libggml-base.so libggml-rpc.so libggml-cpu-baseline.so libggml-cpu-avx.so libggml-cpu-avx2.so)
           for file in "${required[@]}"; do
             test -f "$out/$file" || { echo "Missing required runtime file: $file"; exit 1; }
           done
