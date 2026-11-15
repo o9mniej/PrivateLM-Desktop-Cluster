@@ -3,12 +3,12 @@
 The Windows worker is a **single native C++ executable**. Start
 `privatelm-worker.exe` and it automatically:
 
-1. Reads currently available system RAM and measures approximate memory-read bandwidth.
+1. Reads currently available system RAM and measures approximate host-RAM read bandwidth.
 2. Detects the active LAN IPv4 address and loads the persistent worker ID.
-3. Generates an app-compatible `privatelm://worker` QR code as an SVG and opens it.
-4. Loads the CUDA backend when a usable GPU is available, otherwise falls back to CPU.
-5. Advertises `_privatelm._tcp.local.` with the same TXT metadata as the mobile worker.
-6. Starts the GGML RPC server on TCP port `50052`.
+3. Loads the CUDA backend when a usable GPU is available, otherwise falls back to CPU.
+4. Reads free VRAM from GGML when serving a CUDA device.
+5. Generates an app-compatible `privatelm://worker` QR code with backend and memory metadata.
+6. Advertises `_privatelm._tcp.local.` with matching TXT metadata and starts the GGML RPC server on TCP port `50052`.
 
 There is no Python runtime, Python dependency installation, wrapper process, or
 separate setup script. Keep the console window open while the worker is in use.
@@ -21,11 +21,15 @@ This keeps its RPC protocol aligned with the app.
 
 - mDNS service: `_privatelm._tcp.local.`
 - Default TCP port: `50052`
-- TXT fields: `ram`, `bw`, `model`, `v=rpc7`, `id`
-- QR URI: `privatelm://worker?host=...&port=...&name=...&ram=...&bw=...&id=...`
+- TXT fields: `ram`, `bw`, `model`, `v=rpc7`, `id`, `backend`, `vram`
+- QR URI: `privatelm://worker?host=...&port=...&name=...&ram=...&bw=...&backend=...&vram=...&id=...`
 
-The QR reports **currently available RAM**, not installed RAM. The mobile app
-continues to apply its existing 75% safety margin. The worker ID is persisted
+The QR reports currently available host RAM and, for CUDA workers, currently
+free VRAM. The scheduler uses the existing 75% host-RAM margin for CPU workers
+and an 85% free-VRAM budget for CUDA workers. CUDA workers are prioritized
+ahead of CPU workers when a split is required; CPU-only clusters retain their
+RAM-bandwidth-based scheduling. The host-RAM benchmark is not treated as a
+CUDA performance benchmark. The worker ID is persisted
 under `%LOCALAPPDATA%\PrivateLM\worker-id`.
 
 The QR is saved under `%LOCALAPPDATA%\PrivateLM\worker-qr-<ip>.svg` and
