@@ -93,25 +93,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config
 
-      - name: Configure and build ARM CPU variants
+      - name: Configure and build Raspberry Pi 5 CPU backend
         run: |
+          # Pi 5 uses Cortex-A76 (ARMv8.2-A). Build a Pi-compatible backend
+          # directly instead of GGML_CPU_ALL_VARIANTS, which currently asks
+          # older GCC toolchains to compile an ARMv9.2-SME backend.
           cmake -S desktop/linux-worker -B desktop/linux-worker/build-arm64 -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF \
-            -DGGML_CPU_ALL_VARIANTS=ON
+            -DGGML_CPU_ALL_VARIANTS=OFF \
+            -DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16
           cmake --build desktop/linux-worker/build-arm64 --parallel
 
-      - name: Stage ARM64 worker and backends
+      - name: Stage ARM64 worker and backend
         shell: bash
         run: |
           set -euo pipefail
           out="desktop/linux-worker/dist/cpu-arm64"
           mkdir -p "$out"
           find desktop/linux-worker/build-arm64 \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \) -exec cp -L {} "$out/" \;
-          required=(privatelm-worker libggml.so libggml-base.so libggml-rpc.so libggml-cpu.so libggml-cpu-armv8.0_1.so libggml-cpu-armv8.2_2.so)
+          required=(privatelm-worker libggml.so libggml-base.so libggml-rpc.so libggml-cpu.so)
           for file in "${required[@]}"; do
             test -f "$out/$file" || { echo "Missing required ARM64 runtime file: $file"; exit 1; }
           done
-          echo "Staged Raspberry Pi-compatible ARM64 worker files:"
+          echo "Staged Raspberry Pi 5 ARM64 worker files:"
           ls -lh "$out"
 
       - uses: actions/upload-artifact@v4
