@@ -40,7 +40,7 @@ jobs:
           $out = "desktop/windows-worker/dist/cuda"
           New-Item -ItemType Directory -Force $out | Out-Null
           Get-ChildItem "desktop/windows-worker/build-cuda" -Recurse -File |
-            Where-Object { $_.Name -match '^(privatelm-worker|ggml-.*)\\.(exe|dll)$' } |
+            Where-Object { $_.Name -match '^(privatelm-worker|ggml-.*)\.(exe|dll)$' } |
             Copy-Item -Destination $out -Force
           if (-not (Test-Path "$out/privatelm-worker.exe")) {
             throw "privatelm-worker.exe was not found in the build output"
@@ -73,7 +73,7 @@ jobs:
           $out = "desktop/windows-worker/dist/cpu"
           New-Item -ItemType Directory -Force $out | Out-Null
           Get-ChildItem "desktop/windows-worker/build-cpu" -Recurse -File |
-            Where-Object { $_.Name -match '^(privatelm-worker|ggml-.*)\\.(exe|dll)$' } |
+            Where-Object { $_.Name -match '^(privatelm-worker|ggml-.*)\.(exe|dll)$' } |
             Copy-Item -Destination $out -Force
           if (-not (Test-Path "$out/privatelm-worker.exe")) {
             throw "privatelm-worker.exe was not found in the build output"
