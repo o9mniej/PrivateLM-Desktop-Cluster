@@ -30,10 +30,23 @@ set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${LLAMA_CPP_DIR}" llama.cpp)
 
-add_executable(privatelm-worker src/main.cpp)
+# One native executable: RPC server, Windows system discovery, mDNS and QR.
+add_executable(privatelm-worker
+    src/main.cpp
+    src/third_party/qrcodegen.cpp
+)
 target_include_directories(privatelm-worker PRIVATE
-    "${LLAMA_CPP_DIR}/ggml/include")
-target_link_libraries(privatelm-worker PRIVATE ggml)
+    "${LLAMA_CPP_DIR}/ggml/include"
+    "${CMAKE_CURRENT_LIST_DIR}/src"
+)
+target_link_libraries(privatelm-worker PRIVATE
+    ggml
+    iphlpapi
+    dnsapi
+    ole32
+    shell32
+    ws2_32
+)
 
 if(WIN32)
     target_compile_definitions(privatelm-worker PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
