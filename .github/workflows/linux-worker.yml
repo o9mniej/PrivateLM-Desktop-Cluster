@@ -26,7 +26,9 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build pkg-config
 
       - name: Configure
-        run: cmake -S desktop/linux-worker -B desktop/linux-worker/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF
+        run: cmake -S desktop/linux-worker -B desktop/linux-worker/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF \
+            -DGGML_SSE42=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF \
+            -DGGML_BMI2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_AVX512=OFF
 
       - name: Build
         run: cmake --build desktop/linux-worker/build --parallel
