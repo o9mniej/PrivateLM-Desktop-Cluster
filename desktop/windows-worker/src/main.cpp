@@ -170,13 +170,15 @@ static std::string url_encode(const std::string& value) {
 
 static fs::path write_qr_svg(const fs::path& output_dir, const std::string& host,
     unsigned short port, const std::string& name, uint64_t ram_mb, double bandwidth,
-    const std::string& worker_id) {
+    const std::string& backend, uint64_t vram_mb, const std::string& worker_id) {
     std::ostringstream uri;
     uri << "privatelm://worker?host=" << host
         << "&port=" << port
         << "&name=" << url_encode(name)
         << "&ram=" << ram_mb
         << "&bw=" << std::fixed << std::setprecision(1) << bandwidth
+        << "&backend=" << url_encode(backend)
+        << "&vram=" << vram_mb
         << "&id=" << url_encode(worker_id);
 
     const auto qr = qrcodegen::QrCode::encodeText(uri.str().c_str(), qrcodegen::QrCode::Ecc::MEDIUM);
@@ -214,7 +216,8 @@ static VOID WINAPI on_mdns_registration(DWORD status, PVOID, PDNS_SERVICE_INSTAN
 }
 
 static bool advertise_worker(const std::string& name, const NetworkAddress& network,
-    unsigned short port, uint64_t ram_mb, double bandwidth, const std::string& id) {
+    unsigned short port, uint64_t ram_mb, double bandwidth, const std::string& backend,
+    uint64_t vram_mb, const std::string& id) {
     const std::wstring instance_name = L"PrivateLM " + widen(name) + L"._privatelm._tcp.local.";
     const std::wstring host_name = widen(computer_name()) + L".local.";
     const std::wstring ram = std::to_wstring(ram_mb);
@@ -224,9 +227,12 @@ static bool advertise_worker(const std::string& name, const NetworkAddress& netw
     const std::wstring model = widen(name);
     const std::wstring version = L"rpc7";
     const std::wstring worker_id = widen(id);
+    const std::wstring backend_type = widen(backend);
+    const std::wstring vram = std::to_wstring(vram_mb);
 
-    PCWSTR keys[] = { L"ram", L"bw", L"model", L"v", L"id" };
-    PCWSTR values[] = { ram.c_str(), bw.c_str(), model.c_str(), version.c_str(), worker_id.c_str() };
+    PCWSTR keys[] = { L"ram", L"bw", L"model", L"v", L"id", L"backend", L"vram" };
+    PCWSTR values[] = { ram.c_str(), bw.c_str(), model.c_str(), version.c_str(),
+        worker_id.c_str(), backend_type.c_str(), vram.c_str() };
     IN_ADDR parsed{};
     if (InetPtonA(AF_INET, network.address.c_str(), &parsed) != 1) return false;
     IP4_ADDRESS ip4 = parsed.S_un.S_addr;
@@ -344,16 +350,6 @@ int main(int argc, char** argv) {
                   << "LAN address: " << network.address << "\n"
                   << "RPC port: " << port << "\n\n";
 
-        const fs::path qr_path = write_qr_svg(app_data, network.address, port, name, ram_mb, bandwidth, id);
-        std::cout << "Pairing QR: " << qr_path.string() << "\n";
-        const auto open_result = reinterpret_cast<INT_PTR>(ShellExecuteW(
-            nullptr, L"open", qr_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-        if (open_result <= 32) {
-            std::cout << "Could not open the QR automatically. Open the SVG file shown above.\n";
-        } else {
-            std::cout << "Opened the pairing QR automatically.\n";
-        }
-
         std::cout << "\nLoading GGML backends from: " << exe_dir.string() << "\n";
         ggml_backend_dev_t devices[GGML_RPC_MAX_SERVERS] = {};
         size_t device_count = 0;
@@ -395,7 +391,31 @@ int main(int argc, char** argv) {
             ggml_backend_reg_get_proc_address(rpc, "ggml_backend_rpc_start_server"));
         if (!start_server) throw std::runtime_error("RPC server entry point is missing");
 
-        const bool mdns = advertise_worker(name, network, port, ram_mb, bandwidth, id);
+        const std::string backend = cuda_loaded && device_count > 0 ? "cuda" : "cpu";
+        uint64_t vram_mb = 0;
+        if (backend == "cuda") {
+            for (size_t i = 0; i < device_count; ++i) {
+                size_t free_bytes = 0, total_bytes = 0;
+                ggml_backend_dev_memory(devices[i], &free_bytes, &total_bytes);
+                vram_mb += static_cast<uint64_t>(free_bytes / (1024ull * 1024ull));
+            }
+        }
+        std::cout << "Worker backend: " << backend;
+        if (backend == "cuda") std::cout << " | free VRAM: " << vram_mb << " MiB";
+        std::cout << "\n";
+
+        const fs::path qr_path = write_qr_svg(
+            app_data, network.address, port, name, ram_mb, bandwidth, backend, vram_mb, id);
+        std::cout << "Pairing QR: " << qr_path.string() << "\n";
+        const auto open_result = reinterpret_cast<INT_PTR>(ShellExecuteW(
+            nullptr, L"open", qr_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        if (open_result <= 32) {
+            std::cout << "Could not open the QR automatically. Open the SVG file shown above.\n";
+        } else {
+            std::cout << "Opened the pairing QR automatically.\n";
+        }
+
+        const bool mdns = advertise_worker(name, network, port, ram_mb, bandwidth, backend, vram_mb, id);
         if (mdns) {
             std::cout << "mDNS: advertising _privatelm._tcp.local.\n";
         } else {
