@@ -6,15 +6,15 @@ from __future__ import annotations
 import argparse
 import os
 import platform
-import signal
 import subprocess
-import sys
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlencode
 
 import numpy as np
 import psutil
+import qrcode
 from zeroconf import ServiceInfo, Zeroconf
 
 SERVICE_TYPE = "_privatelm._tcp.local."
@@ -58,6 +58,41 @@ def local_ipv4_addresses() -> list[str]:
     return sorted(set(addresses))
 
 
+def make_worker_qr(
+    host: str,
+    port: int,
+    name: str,
+    ram_mb: int,
+    bandwidth: float,
+    worker_id_value: str,
+) -> Path:
+    """Write a QR using the exact URI format understood by the mobile app."""
+    params = {
+        "host": host,
+        "port": str(port),
+        "name": name,
+        "ram": str(ram_mb),
+        "bw": f"{bandwidth:.1f}",
+        "id": worker_id_value,
+    }
+    payload = f"privatelm://worker?{urlencode(params)}"
+
+    output_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "PrivateLM"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    image_path = output_dir / f"worker-qr-{host.replace('.', '-')}.png"
+
+    image = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    image.add_data(payload)
+    image.make(fit=True)
+    image.make_image(fill_color="black", back_color="white").save(image_path)
+    return image_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="PrivateLM Windows cluster worker")
     parser.add_argument("--rpc-exe", required=True, help="Path to privatelm-worker.exe")
@@ -72,15 +107,37 @@ def main() -> int:
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
 
+    # Match the mobile worker's metadata: report currently available RAM,
+    # not installed RAM. The app applies its own safety margin for placement.
     ram_mb = int(psutil.virtual_memory().available / (1024 * 1024))
     bandwidth = memory_bandwidth_gbps()
     addresses = local_ipv4_addresses()
-    print(f"Worker ID: {worker_id()}")
+    current_worker_id = worker_id()
+
+    print(f"Worker ID: {current_worker_id}")
     print(f"Available RAM: {ram_mb} MiB")
     print(f"Measured memory read bandwidth: {bandwidth:.1f} GB/s")
     print("Local IPv4: " + (", ".join(addresses) if addresses else "not detected"))
-    print("Starting RPC server...")
 
+    qr_paths: list[Path] = []
+    for address in addresses:
+        qr_path = make_worker_qr(
+            address, args.port, args.name, ram_mb, bandwidth, current_worker_id
+        )
+        qr_paths.append(qr_path)
+        print(f"QR for {address}: {qr_path}")
+
+    if qr_paths and os.name == "nt":
+        try:
+            os.startfile(str(qr_paths[0]))
+            if len(qr_paths) > 1:
+                print("Opened the first QR. If it cannot connect, use another QR above.")
+        except OSError as error:
+            print(f"Could not open the QR image automatically: {error}")
+    elif not addresses:
+        print("No QR generated: connect to Wi-Fi/Ethernet and restart the worker.")
+
+    print("Starting RPC server...")
     command = [str(rpc_exe), "--listen", f"0.0.0.0:{args.port}"]
     if args.threads > 0:
         command += ["--threads", str(args.threads)]
@@ -99,7 +156,7 @@ def main() -> int:
             "bw": f"{bandwidth:.1f}",
             "model": args.name,
             "v": "rpc7",
-            "id": worker_id(),
+            "id": current_worker_id,
         },
         server=f"{platform.node().replace(' ', '-')}.local.",
         addresses=[bytes(map(int, ip.split("."))) for ip in addresses],
@@ -110,7 +167,8 @@ def main() -> int:
         zeroconf.register_service(info)
         registered = True
         print(f"Advertising as {service_name} on TCP {args.port}")
-        print("The original Android app should be able to find this worker on the LAN.")
+        print("Scan the opened QR from PrivateLM > Phone cluster > Master.")
+        print("The QR includes available RAM; the app will apply its normal safety margin.")
         print("Press Ctrl+C to stop.")
         while process.poll() is None:
             time.sleep(0.5)
