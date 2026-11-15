@@ -116,3 +116,42 @@ jobs:
           path: desktop/windows-worker/dist/cpu/
           if-no-files-found: error
           retention-days: 14
+
+  build-cpu-x86:
+    name: Windows x86 (32-bit CPU)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -S desktop/windows-worker -B desktop/windows-worker/build-cpu-x86 -A Win32 -DPRIVATELM_ENABLE_CUDA=OFF
+
+      - name: Build
+        run: cmake --build desktop/windows-worker/build-cpu-x86 --config Release --parallel
+
+      - name: Stage 32-bit CPU worker
+        shell: pwsh
+        run: |
+          $out = "desktop/windows-worker/dist/cpu-x86"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Get-ChildItem "desktop/windows-worker/build-cpu-x86" -Recurse -File |
+            Where-Object { $_.Extension -eq ".dll" -or $_.Name -eq "privatelm-worker.exe" } |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $out -Force }
+
+          $required = @("privatelm-worker.exe", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-rpc.dll")
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path $out $_)) }
+          if ($missing.Count -gt 0) {
+            throw "Missing required x86 CPU runtime file(s): $($missing -join ', ')"
+          }
+
+          Write-Host "Staged 32-bit CPU runtime files:"
+          Get-ChildItem $out -File | Select-Object Name, Length | Format-Table -AutoSize
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: privatelm-windows-worker-cpu-x86
+          path: desktop/windows-worker/dist/cpu-x86/
+          if-no-files-found: error
+          retention-days: 14
