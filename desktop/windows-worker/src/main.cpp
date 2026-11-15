@@ -2,6 +2,8 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <stdexcept>
+#include <thread>
 #include <vector>
 
 #include "ggml-backend.h"
