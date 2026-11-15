@@ -10,8 +10,8 @@ class ClusterWorker {
   /// Free RAM the worker reported when it started, in MB (null if unknown).
   final int? ramMb;
 
-  /// Memory read speed the worker measured, in GB/s (null if unknown).
-  /// Token generation speed follows this closely.
+  /// Host RAM read speed in GB/s (null if unknown). Used to rank CPU workers;
+  /// CUDA workers are ranked separately by backend and free VRAM.
   final double? bandwidth;
 
   /// Backend exposed by the worker: cpu or cuda.
