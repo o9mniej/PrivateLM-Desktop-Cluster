@@ -13,6 +13,12 @@ class ClusterWorker {
   /// Memory read speed the worker measured, in GB/s (null if unknown).
   /// Token generation speed follows this closely.
   final double? bandwidth;
+
+  /// Backend exposed by the worker: cpu or cuda.
+  final String backend;
+
+  /// Free GPU memory in MB when [backend] is cuda.
+  final int? vramMb;
   final String? model;
 
   /// The worker device's lasting ID: finds it again when its IP changes.
@@ -24,6 +30,8 @@ class ClusterWorker {
     required this.port,
     this.ramMb,
     this.bandwidth,
+    this.backend = 'cpu',
+    this.vramMb,
     this.model,
     this.id,
   });
@@ -36,13 +44,16 @@ class ClusterWorker {
         port: map['port'] as int,
         ramMb: (map['ramMb'] as num?)?.toInt(),
         bandwidth: (map['bandwidth'] as num?)?.toDouble(),
+        backend: map['backend'] as String? ?? 'cpu',
+        vramMb: (map['vramMb'] as num?)?.toInt(),
         model: map['model'] as String?,
         id: map['id'] as String?,
       );
 
   /// The same device at a new address.
   ClusterWorker movedTo(String host, int port) => ClusterWorker(
-      name: name, host: host, port: port, ramMb: ramMb, bandwidth: bandwidth, model: model, id: id);
+      name: name, host: host, port: port, ramMb: ramMb, bandwidth: bandwidth,
+      backend: backend, vramMb: vramMb, model: model, id: id);
 
   Map<String, dynamic> toMap() => {
         'name': name,
@@ -50,6 +61,8 @@ class ClusterWorker {
         'port': port,
         'ramMb': ramMb,
         'bandwidth': bandwidth,
+        'backend': backend,
+        'vramMb': vramMb,
         'model': model,
         'id': id,
       };
