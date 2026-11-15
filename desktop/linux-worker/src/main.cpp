@@ -272,7 +272,7 @@ int main(int argc, char** argv) {
         // Try optimized CPU plugins first. GGML's backend score function performs
         // runtime CPUID checks and rejects variants whose required ISA is unavailable.
         // Only the first compatible CPU backend is registered.
-        const std::array<const char*, 3> cpu_variants = {
+        const std::array<const char*, 4> cpu_variants = {
             "libggml-cpu-avx2.so",
             "libggml-cpu-avx.so",
             "libggml-cpu-baseline.so",
