@@ -291,7 +291,7 @@ int main(int argc, char** argv) {
         bool cpu_loaded = false;
         for (const char* variant : cpu_variants) {
             if (load_backend(exe_dir, variant)) {
-                std::cout << "Selected CPU backend: " << variant << '\\n';
+                std::cout << "Selected CPU backend: " << variant << '\n';
                 cpu_loaded = true;
                 break;
             }
