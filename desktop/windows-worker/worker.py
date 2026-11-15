@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import os
 import platform
 import subprocess
@@ -55,7 +56,12 @@ def local_ipv4_addresses() -> list[str]:
         for address in item:
             if address.family.name == "AF_INET" and not address.address.startswith("127."):
                 addresses.append(address.address)
-    return sorted(set(addresses))
+    # Prefer ordinary private-LAN addresses over VPN/tunnel interfaces so
+    # the QR opened automatically is more likely to match the phone's Wi-Fi.
+    return sorted(
+        set(addresses),
+        key=lambda value: (not ipaddress.ip_address(value).is_private, value),
+    )
 
 
 def make_worker_qr(
