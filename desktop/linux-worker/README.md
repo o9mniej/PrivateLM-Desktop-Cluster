@@ -1,6 +1,6 @@
 # PrivateLM Linux CPU Worker (experimental)
 
-A single native C++ worker for Linux x86-64. It builds against the exact
+A single native C++ worker for Linux x86-64 and ARM64 (including Raspberry Pi 5). It builds against the exact
 llama.cpp/GGML source vendored in the mobile plugin so its RPC protocol remains
 aligned with the original PrivateLM app.
 
@@ -22,7 +22,7 @@ for automatic discovery. QR/manual pairing remains available without Avahi.
 
 ## Requirements
 
-- Linux x86-64
+- Linux x86-64 or ARM64 (AArch64)
 - CMake 3.22+, a C/C++ compiler, and Git
 - Avahi utilities for mDNS discovery (optional)
 - The build uses the repository's vendored llama.cpp source; no Python is needed.
@@ -50,11 +50,7 @@ cmake -S desktop/linux-worker -B desktop/linux-worker/build -DCMAKE_BUILD_TYPE=R
 cmake --build desktop/linux-worker/build --parallel
 ```
 
-The CI artifact `privatelm-linux-worker-cpu-x64` includes three CPU backend
-variants: AVX2, AVX, and a portable baseline. At startup the worker tries them
-in that order. GGML's own backend score function checks the CPU's supported
-instruction sets; an incompatible optimized variant is rejected before it is
-registered, and the worker tries the next one.
+The x64 CI artifact includes AVX2, AVX, and portable baseline backends. The ARM64 CI artifact includes GGML's ARM CPU variants, from ARMv8.0 through ARMv9.2. At startup the worker tries the available optimized variants in preference order. GGML's backend score function checks the CPU's supported instruction sets; incompatible variants are rejected before registration. On a Raspberry Pi 5, this should select an ARMv8.2-compatible backend when supported by the installed OS/kernel.
 
 For a manual single-variant build, keep the generated `libggml-*.so` files
 beside `privatelm-worker` in the same directory. The worker also accepts the
@@ -82,8 +78,7 @@ does not require a modified mobile app.
 - RPC has no authentication or encryption. Use only on a trusted private LAN;
   do not port-forward the RPC port to the public internet.
 - RAM and network address are sampled at startup. Restart to refresh them.
-- The first version targets Linux x86-64 CPU only. The CI build includes AVX2, AVX, and baseline variants so older and newer x86-64 CPUs can use the fastest compatible backend. ARM64/Raspberry Pi and CUDA
-  will be added separately after this target is validated.
+- Linux x86-64 and ARM64 CPU workers are supported. CUDA remains a separate future target.
 - If the host has multiple LAN adapters, the worker chooses a private IPv4
   address first; manual pairing can be used with another interface address.
 
