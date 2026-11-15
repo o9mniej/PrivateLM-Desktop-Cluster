@@ -1,0 +1,53 @@
+name: Linux worker build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "desktop/linux-worker/**"
+      - "local_plugins/llama_flutter_android/android/src/main/cpp/llama.cpp/**"
+      - ".github/workflows/linux-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-cpu-x64:
+    name: Linux x64 (CPU)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config
+
+      - name: Configure
+        run: cmake -S desktop/linux-worker -B desktop/linux-worker/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPRIVATELM_ENABLE_NATIVE=OFF
+
+      - name: Build
+        run: cmake --build desktop/linux-worker/build --parallel
+
+      - name: Stage worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="desktop/linux-worker/dist/cpu-x64"
+          mkdir -p "$out"
+          find desktop/linux-worker/build -type f \( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \) -exec cp -L {} "$out/" \;
+          required=(privatelm-worker libggml.so libggml-base.so libggml-cpu.so libggml-rpc.so)
+          for file in "${required[@]}"; do
+            test -f "$out/$file" || { echo "Missing required runtime file: $file"; exit 1; }
+          done
+          echo "Staged Linux worker files:"
+          ls -lh "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: privatelm-linux-worker-cpu-x64
+          path: desktop/linux-worker/dist/cpu-x64/
+          if-no-files-found: error
+          retention-days: 14
