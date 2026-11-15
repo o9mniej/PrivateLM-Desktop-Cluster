@@ -37,9 +37,13 @@ class ClusterShare {
 class _Phone {
   final ClusterWorker? worker; // null: the master itself
   final double capacityMb;
-  final double speed; // GB/s
+  final double speed; // CPU RAM bandwidth in GB/s; not used to rank CUDA devices.
+  final String backend;
   double assignedMb = 0;
-  _Phone(this.worker, this.capacityMb, this.speed);
+  _Phone(this.worker, this.capacityMb, this.speed)
+      : backend = worker?.backend.toLowerCase() ?? 'cpu';
+
+  bool get isCuda => backend == 'cuda';
 }
 
 /// Phone cluster: spread a GGUF model across phones on the same Wi-Fi.
@@ -169,6 +173,7 @@ class ClusterService extends GetxService {
       if (deviceName.isNotEmpty) 'name': deviceName,
       if (status.ramMb > 0) 'ram': '${status.ramMb}',
       if (status.bandwidth > 0) 'bw': status.bandwidth.toStringAsFixed(1),
+      'backend': 'cpu',
       if (status.id != null) 'id': status.id!,
     }).toString();
   }
@@ -250,6 +255,8 @@ class ClusterService extends GetxService {
       port: port,
       ramMb: int.tryParse(params['ram'] ?? ''),
       bandwidth: double.tryParse(params['bw'] ?? ''),
+      backend: params['backend'] ?? 'cpu',
+      vramMb: int.tryParse(params['vram'] ?? ''),
       model: params['name'],
       id: params['id'],
     ));
@@ -376,7 +383,13 @@ class ClusterService extends GetxService {
     final phones = [
       master,
       for (final w in available)
-        _Phone(w, (w.ramMb ?? 2000) * 0.75, w.bandwidth ?? _unknownSpeed),
+        _Phone(
+          w,
+          w.backend.toLowerCase() == 'cuda'
+              ? (w.vramMb ?? 0) * 0.85 // Keep 15% VRAM free for runtime/KV overhead.
+              : (w.ramMb ?? 2000) * 0.75,
+          w.bandwidth ?? _unknownSpeed,
+        ),
     ];
     final totalMb = phones.fold<double>(0, (a, p) => a + p.capacityMb);
     if (needMb > totalMb) {
@@ -398,7 +411,11 @@ class ClusterService extends GetxService {
         await LlamaCluster.clear();
         return 0;
       }
-      _splitBySpeed(phones, needMb);
+      if (phones.any((p) => p.isCuda)) {
+        _fillFastestFirst(phones, needMb);
+      } else {
+        _splitBySpeed(phones, needMb);
+      }
     } else {
       _fillFastestFirst(phones, needMb);
     }
@@ -424,7 +441,12 @@ class ClusterService extends GetxService {
 
   /// Fastest first, each up to its free memory, until the model is placed.
   static void _fillFastestFirst(List<_Phone> phones, double needMb) {
-    final bySpeed = [...phones]..sort((a, b) => b.speed.compareTo(a.speed));
+    final bySpeed = [...phones]..sort((a, b) {
+      // A CUDA worker contributes GPU VRAM and GPU compute; its host-RAM
+      // benchmark is not comparable to a phone's CPU memory benchmark.
+      if (a.isCuda != b.isCuda) return a.isCuda ? -1 : 1;
+      return b.speed.compareTo(a.speed);
+    });
     var left = needMb;
     for (final p in bySpeed) {
       p.assignedMb = math.min(p.capacityMb, left);
