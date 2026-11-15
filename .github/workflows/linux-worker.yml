@@ -60,7 +60,7 @@ jobs:
           mkdir -p "$out"
 
           # Shared runtime libraries and the worker are identical across variants.
-          find desktop/linux-worker/build-baseline \\( -type f -o -type l \\) \\( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \\) -exec cp -L {} "$out/" \;
+          find desktop/linux-worker/build-baseline \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' -o -name 'privatelm-worker' \) -exec cp -L {} "$out/" \;
 
           cp -L desktop/linux-worker/build-baseline/bin/libggml-cpu.so "$out/libggml-cpu-baseline.so"
           cp -L desktop/linux-worker/build-avx/bin/libggml-cpu.so "$out/libggml-cpu-avx.so"
