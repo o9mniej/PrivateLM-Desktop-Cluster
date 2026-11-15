@@ -269,8 +269,24 @@ int main(int argc, char** argv) {
                   << " GB/s\nLAN address: " << network.address << "\nRPC port: " << port << "\n";
 
         std::cout << "\nLoading GGML backends from: " << exe_dir << '\n';
-        if (!load_backend(exe_dir, "libggml-cpu.so"))
-            throw std::runtime_error("CPU backend could not be loaded");
+        // Try optimized CPU plugins first. GGML's backend score function performs
+        // runtime CPUID checks and rejects variants whose required ISA is unavailable.
+        // Only the first compatible CPU backend is registered.
+        const std::array<const char*, 3> cpu_variants = {
+            "libggml-cpu-avx2.so",
+            "libggml-cpu-avx.so",
+            "libggml-cpu-baseline.so"
+        };
+        bool cpu_loaded = false;
+        for (const char* variant : cpu_variants) {
+            if (load_backend(exe_dir, variant)) {
+                std::cout << "Selected CPU backend: " << variant << '\\n';
+                cpu_loaded = true;
+                break;
+            }
+        }
+        if (!cpu_loaded)
+            throw std::runtime_error("No compatible CPU backend could be loaded (tried AVX2, AVX, and baseline)");
         ggml_backend_dev_t devices[GGML_RPC_MAX_SERVERS] = {};
         size_t count = 0;
         for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
